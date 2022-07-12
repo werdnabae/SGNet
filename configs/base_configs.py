@@ -14,4 +14,7 @@ def parse_base_args():
     parser.add_argument('--seed', default=1, type=int)
     parser.add_argument('--phases', default=['train', 'test'], type=list)
     parser.add_argument('--shuffle', default=True, type=bool)
+    parser.add_argument('--age', default='all', type=str)
+    parser.add_argument('--split', default='test', type=str)
+    parser.add_argument('--gender', default='all', type=str) # all, male, or female
     return parser

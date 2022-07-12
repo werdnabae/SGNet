@@ -39,6 +39,7 @@ from os import makedirs, listdir
 from sklearn.model_selection import train_test_split, KFold
 import pdb
 
+
 class PIE(object):
     def __init__(self, regen_database=False, data_path=''):
         """
@@ -350,7 +351,7 @@ class PIE(object):
             if obj_label == 'pedestrian':
                 annotations[ped_annt][obj_id] = {'frames': [], 'bbox': [], 'occlusion': []}
                 annotations[ped_annt][obj_id]['behavior'] = {'gesture': [], 'look': [], 'action': [], 'cross': []}
-                prev_frame = int(boxes[0].get('frame'))-1
+                prev_frame = int(boxes[0].get('frame')) - 1
                 for b in boxes:
                     # Exclude the annotations that are outside of the frame
                     if int(b.get('outside')) == 1:
@@ -372,7 +373,7 @@ class PIE(object):
                     # else:
                     annotations[ped_annt][obj_id]['bbox'].append(
                         [float(b.get('xtl')), float(b.get('ytl')),
-                        float(b.get('xbr')), float(b.get('ybr'))])
+                         float(b.get('xbr')), float(b.get('ybr'))])
                     occ = self._map_text_to_scalar('occlusion', b.find('./attribute[@name=\"occlusion\"]').text)
                     annotations[ped_annt][obj_id]['occlusion'].append(occ)
                     annotations[ped_annt][obj_id]['frames'].append(int(b.get('frame')))
@@ -391,12 +392,12 @@ class PIE(object):
                                                      'obj_class': obj_label,
                                                      'obj_type': obj_type,
                                                      'state': []}
-                prev_frame = int(boxes[0].get('frame'))-1
+                prev_frame = int(boxes[0].get('frame')) - 1
                 for b in boxes:
                     # Exclude the annotations that are outside of the frame
                     if int(b.get('outside')) == 1:
                         continue
-                    
+
                     # # NOTE: April 6, add function to interpolate the missed bboxes.
                     # if int(b.get('frame')) != prev_frame+1:
                     #     missed_steps = int(b.get('frame')) - prev_frame
@@ -413,14 +414,14 @@ class PIE(object):
                     #     pdb.set_trace()
                     # else:
                     annotations[traffic_annt][obj_id]['bbox'].append(
-                    [float(b.get('xtl')), float(b.get('ytl')),
-                        float(b.get('xbr')), float(b.get('ybr'))])
+                        [float(b.get('xtl')), float(b.get('ytl')),
+                         float(b.get('xbr')), float(b.get('ybr'))])
                     annotations[traffic_annt][obj_id]['occlusion'].append(int(b.get('occluded')))
                     annotations[traffic_annt][obj_id]['frames'].append(int(b.get('frame')))
                     if obj_label == 'traffic_light':
                         annotations[traffic_annt][obj_id]['state'].append(self._map_text_to_scalar('state',
-                                                                                                b.find(
-                                                                                                    './attribute[@name=\"state\"]').text))
+                                                                                                   b.find(
+                                                                                                       './attribute[@name=\"state\"]').text))
                     # prev_frame = int(b.get('frame'))
                     # NOTE: April 6th, this repeated frame_ids might be a bug?
                     # annotations[traffic_annt][obj_id]['frames'].append(int(b.get('frame')))
@@ -897,7 +898,7 @@ class PIE(object):
         """
         return [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2]
 
-    def generate_data_trajectory_sequence(self, image_set, **opts):
+    def generate_data_trajectory_sequence(self, image_set, age_type, gender, **opts):
         """
         Generates pedestrian tracks
         :param image_set: the split set to produce for. Options are train, test, val.
@@ -935,15 +936,15 @@ class PIE(object):
         self._print_dict(params)
         annot_database = self.generate_database()
         if params['seq_type'] == 'trajectory':
-            sequence_data = self._get_trajectories(image_set, annot_database, **params)
+            sequence_data = self._get_trajectories(image_set, age_type, gender, annot_database, **params)
         elif params['seq_type'] == 'crossing':
             sequence_data = self._get_crossing(image_set, annot_database, **params)
         elif params['seq_type'] == 'intention':
             sequence_data = self._get_intention(image_set, annot_database, **params)
 
-        return sequence_data
+        return sequence_data  # The entire dataset is reduced into
 
-    def _get_trajectories(self, image_set, annotations, **params):
+    def _get_trajectories(self, image_set, age_type, gender, annotations, **params):
         """
         Generates trajectory data.
         :param image_set: Data split to use
@@ -959,7 +960,7 @@ class PIE(object):
         sq_ratio = params['squarify_ratio']
         height_rng = params['height_rng']
 
-        image_seq, pids_seq, frame_seq = [], [], [] # NOTE: record image paths, person ids, and frame_ids
+        image_seq, pids_seq, frame_seq = [], [], []  # NOTE: record image paths, person ids, and frame_ids
         box_seq, center_seq, occ_seq = [], [], []
         # intent_seq = []
         resolution_seq = []
@@ -969,6 +970,25 @@ class PIE(object):
         traffic_bbox_seq, traffic_class_seq, traffic_obj_id_seq = [], [], []
         set_ids, _pids = self._get_data_ids(image_set, params)
 
+        def switch_age_num_to_string(num):
+            if num == 0:
+                return 'child'
+            elif num == 1:
+                return 'child'
+            elif num == 2:
+                return 'adult'
+            elif num == 3:
+                return 'elderly'
+
+        def switch_gender_num_to_string(num):
+            if num == 0:
+                return 'NA'
+            if num == 1:
+                return 'female'
+            if num == 2:
+                return 'male'
+
+
         for sid in set_ids:
             for vid in sorted(annotations[sid]):
                 img_width = annotations[sid][vid]['width']
@@ -976,8 +996,18 @@ class PIE(object):
                 pid_annots = annotations[sid][vid]['ped_annotations']
                 vid_annots = annotations[sid][vid]['vehicle_annotations']
                 traffic_annots = annotations[sid][vid]['traffic_annotations']
-                
+
                 for pid in sorted(pid_annots):
+                    if age_type != 'all' and age_type != 'no_label':
+                        if pid_annots[pid]['attributes'] == {}:
+                            continue
+                        if switch_age_num_to_string(pid_annots[pid]['attributes']['age']) != age_type:
+                            continue
+                    if gender != 'all':
+                        if switch_gender_num_to_string(pid_annots[pid]['attributes']['gender']) != gender:
+                            continue
+                    if age_type == 'no_label' and pid_annots[pid]['attributes'] != {}:
+                        continue
                     if params['data_split_type'] != 'default' and pid not in _pids:
                         continue
                     num_pedestrians += 1
@@ -1010,7 +1040,7 @@ class PIE(object):
                     int_prob = [[pid_annots[pid]['attributes']['intention_prob']]] * len(boxes)
                     int_bin = [[int(pid_annots[pid]['attributes']['intention_prob'] > 0.5)]] * len(boxes)
                     intention_prob.append(int_prob[::seq_stride])
-                    intention_binary.append(int_bin[::seq_stride])              
+                    intention_binary.append(int_bin[::seq_stride])
 
                     resolutions = [[img_width, img_height]] * len(boxes)
                     resolution_seq.append(resolutions[::seq_stride])
@@ -1022,7 +1052,7 @@ class PIE(object):
                     head_ang_seq.append([[vid_annots[i]['heading_angle']] for i in frame_ids][::seq_stride])
                     yrp_seq.append([(vid_annots[i]['yaw'], vid_annots[i]['roll'], vid_annots[i]['pitch'])
                                     for i in frame_ids][::seq_stride])
-                    
+
                     # NOTE: Aprial 6th, get the frame ids of this pedestrian
                     frame_seq.append(frame_ids[::seq_stride])
                     # NOTE: get traffic for each person
@@ -1035,12 +1065,11 @@ class PIE(object):
                         traffics['bboxes'] = np.zeros((1, seq_len, 4))
                         traffics['classes'] = -1 * np.ones((1, seq_len))
                         traffics['obj_ids'] = -1 * np.ones((1, seq_len))
-                    
+
                     traffic_bbox_seq.append(np.array(traffics['bboxes'])[:, ::seq_stride, :])
                     traffic_class_seq.append(np.array(traffics['classes'])[:, ::seq_stride])
                     traffic_obj_id_seq.append(np.array(traffics['obj_ids'])[:, ::seq_stride])
-                   
-                        
+
         print('Subset: %s' % image_set)
         print('Number of pedestrians: %d ' % num_pedestrians)
         print('Total number of used pedestrians: %d ' % len(image_seq))
@@ -1069,20 +1098,20 @@ class PIE(object):
         obj_bboxes, obj_classes, obj_ids = [], [], []
         for traffic_id, val in traffic_annots.items():
             if pid == traffic_id:
-                continue # skip itself
-            if not traffic_id.endswith(obj_type): # skip objects other than vehicle
+                continue  # skip itself
+            if not traffic_id.endswith(obj_type):  # skip objects other than vehicle
                 continue
             obj_frames = val['frames']
-            if frame_ids[-1] - obj_frames[0] < 15 or obj_frames[-1] - frame_ids[0] < 15: 
+            if frame_ids[-1] - obj_frames[0] < 15 or obj_frames[-1] - frame_ids[0] < 15:
                 # NOTE: skip objects whose temporal overlap with target pedestrian is shorter than 0.5 seconds
                 continue
             obj_bbox = val['bbox']
             # 1. make the traffic sequence to be a hash table
-            
+
             obj_hash = {}
             for frame_id, bbox in zip(obj_frames, obj_bbox):
                 obj_hash[frame_id] = bbox
-            # 2. match with the target ped sequence frame-by-frame, 
+            # 2. match with the target ped sequence frame-by-frame,
             #    the total complexity is number_traffics * len_traffic_seq
             obj_bbox = []
             for frame_id in frame_ids:
@@ -1101,13 +1130,13 @@ class PIE(object):
             #     obj_bbox = obj_bbox + [[0., 0., 0., 0.] for i in range(frame_ids[-1]-obj_frames[-1])]
             # else:
             #     obj_bbox = obj_bbox[:len(frame_ids)]#frame_ids[-1] - obj_frames[-1]
-            
+
             if len(obj_bbox) != len(frame_ids):
                 pdb.set_trace()
 
             class_to_id = {'vehicle': 1}
             if obj_type == '':
-                obj_class = [2] * len(frame_ids) # pedestrian is 2
+                obj_class = [2] * len(frame_ids)  # pedestrian is 2
             else:
                 obj_class = [class_to_id[val['obj_class']]] * len(frame_ids)
             obj_bboxes.append(obj_bbox)
@@ -1273,13 +1302,13 @@ class PIE(object):
 
                     intention_prob.append(int_prob[::seq_stride])
                     intention_binary.append(int_bin[::seq_stride])
-                    
+
                     resolutions = [[img_width, img_height]] * len(boxes)
                     resolution_seq.append(resolutions[::seq_stride])
 
                     ped_ids = [[pid]] * len(boxes)
                     pids_seq.append(ped_ids[::seq_stride])
-            
+
         print('Subset: %s' % image_set)
         print('Number of pedestrians: %d ' % num_pedestrians)
         print('Total number of samples: %d ' % len(image_seq))

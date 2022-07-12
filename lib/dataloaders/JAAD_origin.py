@@ -367,7 +367,7 @@ class JAAD(object):
                   'bag_shoulder', 'bag_left_side', 'bag_right_side', 'cap',
                   'hood', 'sunglasses', 'umbrella', 'phone',
                   'baby', 'object', 'stroller_cart', 'bicycle_motorcycle']
-        path_to_file = join(self._annotation_appearance_path , vid + '_appearance.xml')
+        path_to_file = join(self._annotation_appearance_path, vid + '_appearance.xml')
         tree = ET.parse(path_to_file)
         annotations = {}
         ped_tracks = tree.findall("./track")
@@ -398,7 +398,7 @@ class JAAD(object):
                                                     'ped_sign': f.get('ped_sign'),
                                                     'stop_sign': f.get('stop_sign'),
                                                     'traffic_light': self._map_text_to_scalar('traffic_light',
-                                                                                             f.get('traffic_light'))}
+                                                                                              f.get('traffic_light'))}
 
         return traffic_attributes
 
@@ -508,7 +508,7 @@ class JAAD(object):
         video_ids = sorted(self._get_video_ids())
         database = {}
         for vid in video_ids:
-            #print('Getting annotations for %s' % vid)
+            print('Getting annotations for %s' % vid)
             vid_annotations = self._get_annotations(vid)
             vid_attributes = self._get_ped_attributes(vid)
             vid_appearance = self._get_ped_appearance(vid)
@@ -787,12 +787,12 @@ class JAAD(object):
             img_width = annotations[vid]['width']
             img_height = annotations[vid]['height']
             num_frames = annotations[vid]['num_frames']
-            for i in range(0,num_frames,frame_stride):
+            for i in range(0, num_frames, frame_stride):
                 ped_samples[join(self._jaad_path, 'images', vid, '{:05d}.png'.format(i))] = []
             for pid in annotations[vid]['ped_annotations']:
                 if params['data_split_type'] != 'default' and pid not in _pids:
                     continue
-                difficult =  0
+                difficult = 0
                 if 'p' in pid:
                     difficult = -1
                     if image_set in ['train', 'val']:
@@ -812,13 +812,13 @@ class JAAD(object):
                             if squarify_ratio:
                                 b = self._squarify(b, squarify_ratio, img_width)
                             ped_samples[imgs[i]].append(
-                                                {'width': img_width,
-                                                'height': img_height,
-                                                'tag': pid,
-                                                'box': b,
-                                                'seg_area': (b[2] - b[0] + 1) * (b[3] - b[1] + 1),
-                                                'occlusion': occlusion[i],
-                                                'difficult': difficult})
+                                {'width': img_width,
+                                 'height': img_height,
+                                 'tag': pid,
+                                 'box': b,
+                                 'seg_area': (b[2] - b[0] + 1) * (b[3] - b[1] + 1),
+                                 'occlusion': occlusion[i],
+                                 'difficult': difficult})
                             if pid not in unique_samples:
                                 unique_samples.append(pid)
                             total_sample_count += 1
@@ -980,7 +980,7 @@ class JAAD(object):
         """
         return [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2]
 
-    def generate_data_trajectory_sequence(self, image_set, **opts):
+    def generate_data_trajectory_sequence(self, image_set, age_type, gender, **opts):
         """
         Generates pedestrian tracks
         :param image_set: the split set to produce for. Options are train, test, val.
@@ -1018,8 +1018,8 @@ class JAAD(object):
                                     'val_data': True,
                                     'regen_data': False},
                   'kfold_params': {'num_folds': 5, 'fold': 1}}
-        assert all(k in params for k in opts.keys()), "Wrong option(s)."\
-        "Choose one of the following: {}".format(list(params.keys()))
+        assert all(k in params for k in opts.keys()), "Wrong option(s)." \
+                                                      "Choose one of the following: {}".format(list(params.keys()))
         params.update(opts)
 
         print('---------------------------------------------------------')
@@ -1028,7 +1028,7 @@ class JAAD(object):
 
         annot_database = self.generate_database()
         if params['seq_type'] == 'trajectory':
-            sequence = self._get_trajectories(image_set, annot_database, **params)
+            sequence = self._get_trajectories(image_set, age_type, gender, annot_database, **params)
         elif params['seq_type'] == 'crossing':
             sequence = self._get_crossing(image_set, annot_database, **params)
         elif params['seq_type'] == 'intention':
@@ -1036,7 +1036,7 @@ class JAAD(object):
 
         return sequence
 
-    def _get_trajectories(self, image_set, annotations, **params):
+    def _get_trajectories(self, image_set, age_type, gender, annotations, **params):
         """
         Generates trajectory data.
         :param params: Parameters for generating trajectories
@@ -1059,6 +1059,24 @@ class JAAD(object):
         resolution_seq = []
         video_ids, _pids = self._get_data_ids(image_set, params)
 
+        def switch_age_num_to_string(num):
+            if num == 0:
+                return 'child'
+            elif num == 1:
+                return 'child'
+            elif num == 2:
+                return 'adult'
+            elif num == 3:
+                return 'elderly'
+
+        def switch_gender_num_to_string(num):
+            if num == 0:
+                return 'NA'
+            if num == 1:
+                return 'female'
+            if num == 2:
+                return 'male'
+
         for vid in sorted(video_ids):
             img_width = annotations[vid]['width']
             img_height = annotations[vid]['height']
@@ -1072,6 +1090,19 @@ class JAAD(object):
                     continue
                 if params['sample_type'] == 'beh' and 'b' not in pid:
                     continue
+                if age_type != 'all' and age_type != 'no_label':
+                    if pid_annots[pid]['attributes'] == {}:
+                        continue
+                    if switch_age_num_to_string(pid_annots[pid]['attributes']['age']) != age_type:
+                        continue
+                if age_type == 'no_label' and pid_annots[pid]['attributes'] != {}:
+                    continue
+                if gender != 'all':
+                    if pid_annots[pid]['attributes'] == {}:
+                        continue
+                    if switch_gender_num_to_string(pid_annots[pid]['attributes']['gender']) != gender:
+                        continue
+
                 num_pedestrians += 1
                 frame_ids = pid_annots[pid]['frames']
                 images = [join(self._jaad_path, 'images', vid, '{:05d}.png'.format(f)) for f in
@@ -1173,7 +1204,7 @@ class JAAD(object):
                 if event_frame == -1:
                     end_idx = -3
                 else:
-                   end_idx = frame_ids.index(event_frame)
+                    end_idx = frame_ids.index(event_frame)
                 boxes = pid_annots[pid]['bbox'][:end_idx + 1]
                 frame_ids = frame_ids[: end_idx + 1]
                 images = [self._get_image_path(vid, f) for f in frame_ids]

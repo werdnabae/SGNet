@@ -2,7 +2,7 @@ import os
 import json
 import numpy as np
 from .data_utils import bbox_denormalize, cxcywh_to_x1y1x2y2
-from nuscenes.prediction import convert_local_coords_to_global
+# from nuscenes.prediction import convert_local_coords_to_global # commented out
 def compute_IOU(bbox_true, bbox_pred, format='xywh'):
     '''
     compute IOU
@@ -43,6 +43,11 @@ def eval_jaad_pie(input_traj_np, target_traj_np, all_dec_traj_np):
     CMSE=0
     CFMSE=0
     FIOU=0
+    MSE_05_total = []
+    MSE_10_total = []
+    MSE_15_total = []
+    CFMSE_total = []
+    CMSE_total = []
     for batch_index in range(all_dec_traj_np.shape[0]):
         input_traj = np.expand_dims(input_traj_np[batch_index], axis=1)
 
@@ -55,6 +60,9 @@ def eval_jaad_pie(input_traj_np, target_traj_np, all_dec_traj_np):
         all_dec_traj_xyxy = cxcywh_to_x1y1x2y2(all_dec_traj)
         target_traj_xyxy = cxcywh_to_x1y1x2y2(target_traj)
 
+        MSE_05_total.append(np.square(target_traj_xyxy[-1,0:15,:] - all_dec_traj_xyxy[-1,0:15,:]).mean(axis=None))
+        MSE_10_total.append(np.square(target_traj_xyxy[-1,0:30,:] - all_dec_traj_xyxy[-1,0:30,:]).mean(axis=None))
+        MSE_15_total.append(np.square(target_traj_xyxy[-1,0:45,:] - all_dec_traj_xyxy[-1,0:45,:]).mean(axis=None))
 
         MSE_15 += np.square(target_traj_xyxy[-1,0:45,:] - all_dec_traj_xyxy[-1,0:45,:]).mean(axis=None)
         MSE_05 += np.square(target_traj_xyxy[-1,0:15,:] - all_dec_traj_xyxy[-1,0:15,:]).mean(axis=None)
@@ -62,14 +70,17 @@ def eval_jaad_pie(input_traj_np, target_traj_np, all_dec_traj_np):
 
         FMSE +=np.square(target_traj_xyxy[-1,44,:] - all_dec_traj_xyxy[-1,44,:]).mean(axis=None)
 
-
+        CMSE_total.append(np.square(target_traj[-1,0:45,:2] - all_dec_traj[-1,0:45,:2]).mean(axis=None))
+        CFMSE_total.append(np.square(target_traj[-1,44,:2] - all_dec_traj[-1,44,:2]).mean(axis=None))
         CMSE += np.square(target_traj[-1,0:45,:2] - all_dec_traj[-1,0:45,:2]).mean(axis=None)
         CFMSE += np.square(target_traj[-1,44,:2] - all_dec_traj[-1,44,:2]).mean(axis=None)
         tmp_FIOU = []
         for i in range(target_traj_xyxy.shape[0]):
             tmp_FIOU.append(compute_IOU(target_traj_xyxy[i,44,:], all_dec_traj_xyxy[i,44,:], format='x1y1x2y2'))
         FIOU += np.mean(tmp_FIOU)
-    return MSE_15, MSE_05, MSE_10, FMSE, CMSE, CFMSE, FIOU
+    MSE_total_dict = {'ADE_05': MSE_05_total, 'ADE_10': MSE_10_total, 'ADE_15': MSE_15_total,
+                      'CADE': CMSE_total, 'CFADE': CFMSE_total}
+    return MSE_15, MSE_05, MSE_10, FMSE, CMSE, CFMSE, FIOU, MSE_total_dict
 
 
 def eval_jaad_pie_cvae(input_traj, target_traj, cvae_all_dec_traj):

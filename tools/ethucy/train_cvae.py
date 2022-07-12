@@ -16,10 +16,11 @@ from lib.models import build_model
 from lib.losses import rmse_loss
 from lib.utils.ethucy_train_utils_cvae import train, val, test
 
+
 def main(args):
     this_dir = osp.dirname(__file__)
     model_name = args.model
-    save_dir = osp.join(this_dir, 'checkpoints', args.dataset,model_name,str(args.dropout), str(args.seed))
+    save_dir = osp.join(this_dir, 'checkpoints', args.dataset, model_name, str(args.dropout), str(args.seed))
     if not osp.isdir(save_dir):
         os.makedirs(save_dir)
 
@@ -29,11 +30,10 @@ def main(args):
     model = build_model(args)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.2, patience=5,
-                                                           min_lr=1e-10, verbose=1)
+                                                        min_lr=1e-10, verbose=1)
     model = nn.DataParallel(model)
     model = model.to(device)
     if osp.isfile(args.checkpoint):
-
         checkpoint = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -42,13 +42,11 @@ def main(args):
 
     criterion = rmse_loss().to(device)
 
-    train_gen = utl.build_data_loader(args, 'train', batch_size = 1)
-    val_gen = utl.build_data_loader(args, 'val', batch_size = 1)
-    test_gen = utl.build_data_loader(args, 'test', batch_size = 1)
+    train_gen = utl.build_data_loader(args, 'train', batch_size=1)
+    val_gen = utl.build_data_loader(args, 'val', batch_size=1)
+    test_gen = utl.build_data_loader(args, 'test', batch_size=1)
     print("Number of validation samples:", val_gen.__len__())
     print("Number of test samples:", test_gen.__len__())
-
-
 
     # train
     min_loss = 1e6
@@ -59,7 +57,7 @@ def main(args):
     best_model = None
     best_model_metric = None
 
-    for epoch in range(args.start_epoch, args.epochs+args.start_epoch):
+    for epoch in range(args.start_epoch, args.epochs + args.start_epoch):
         print("Number of training samples:", len(train_gen))
 
         # train
@@ -67,13 +65,12 @@ def main(args):
         # print('Train Epoch: ', epoch, 'Goal loss: ', train_goal_loss, 'Decoder loss: ', train_dec_loss, 'CVAE loss: ', train_cvae_loss, \
         #     'KLD loss: ', train_KLD_loss, 'Total: ', total_train_loss) 
         print('Train Epoch: {} \t Goal loss: {:.4f}\t  CVAE loss: {:.4f}\t KLD loss: {:.4f}\t Total: {:.4f}'.format(
-                epoch,train_goal_loss, train_cvae_loss, train_KLD_loss, train_goal_loss + train_cvae_loss + train_KLD_loss ))
-
+            epoch, train_goal_loss, train_cvae_loss, train_KLD_loss,
+            train_goal_loss + train_cvae_loss + train_KLD_loss))
 
         # val
         val_loss = val(model, val_gen, criterion, device)
         lr_scheduler.step(val_loss)
-
 
         # test
         test_loss, ADE_08, FDE_08, ADE_12, FDE_12 = test(model, test_gen, criterion, device)

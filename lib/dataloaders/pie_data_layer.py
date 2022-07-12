@@ -37,7 +37,7 @@ class PIEDataLayer(data.Dataset):
         
         traj_model_opts['enc_input_type'].extend(['obd_speed', 'heading_angle'])
         traj_model_opts['prediction_type'].extend(['obd_speed', 'heading_angle'])
-        beh_seq = imdb.generate_data_trajectory_sequence(self.split, **traj_data_opts)
+        beh_seq = imdb.generate_data_trajectory_sequence(args.split, args.age, args.gender, **traj_data_opts)
         self.data = self.get_traj_data(beh_seq, **traj_model_opts)
         
     def __getitem__(self, index):

@@ -33,7 +33,7 @@ class JAADDataLayer(data.Dataset):
         self.downsample_step = int(30/self.args.FPS)
         imdb = JAAD(data_path=self.root)
         #imdb.generate_database()
-        beh_seq = imdb.generate_data_trajectory_sequence(self.split, **data_opts)
+        beh_seq = imdb.generate_data_trajectory_sequence(args.split, args.age, args.gender, **data_opts)
         self.data = self.get_data(beh_seq, **traj_model_opts)
     def __getitem__(self, index):
         obs_bbox = torch.FloatTensor(self.data['obs_bbox'][index])
